@@ -183,11 +183,7 @@ $("play").addEventListener("click", () => (playing ? stop() : play()));
 ($("ombak") as HTMLInputElement).addEventListener("input", (e) => {
   state.ombak = parseFloat((e.target as HTMLInputElement).value);
   $("ombakVal").textContent = state.ombak.toFixed(1);
-  if (renderer && ctx) {
-    detach?.();
-    renderer = new WebAudioRenderer(ctx, { gain: 0.4, ombakHz: state.ombak });
-    detach = renderer.attach(conductor);
-  }
+  if (renderer) renderer.ombakHz = state.ombak; // live, no renderer rebuild
 });
 
 ($("alpha") as HTMLInputElement).addEventListener("input", (e) => {

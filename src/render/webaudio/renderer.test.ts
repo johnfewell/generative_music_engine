@@ -132,6 +132,39 @@ describe("WebAudioRenderer", () => {
     expect(hit).toBe(true);
   });
 
+  it("ombakHz is live-settable and doubles melody voices into a pair", () => {
+    const noteFor = (time: number): NoteEvent => ({
+      time,
+      layer: "melody",
+      node: 0,
+      freq: 440,
+      velocity: 0.5,
+      duration: 0.3,
+      pan: 0,
+    });
+    let cb: ((e: NoteEvent) => void) | null = null;
+    const fake = {
+      on: (_t: string, f: (e: NoteEvent) => void) => {
+        cb = f;
+        return () => {};
+      },
+    } as unknown as import("../../conductor/index.js").Conductor;
+
+    const ctx = new StubCtx();
+    const renderer = new WebAudioRenderer(ctx as unknown as BaseAudioContext);
+    renderer.attach(fake);
+
+    cb!(noteFor(1)); // ombak off: one strike (a detuned bar pair)
+    const dry = ctx.oscillators.length;
+
+    renderer.ombakHz = 5; // live change, no re-attach
+    cb!(noteFor(2)); // ombak on: the strike doubles into an ombak pair
+    const wet = ctx.oscillators.length - dry;
+
+    expect(dry).toBeGreaterThan(0);
+    expect(wet).toBe(dry * 2);
+  });
+
   it("unsubscribes cleanly, so no further events are rendered", () => {
     const { ctx, conductor } = makeSetup();
     // makeSetup already attached one renderer; attach a second we can detach

@@ -33,7 +33,8 @@ type Voice = (
 export class WebAudioRenderer {
   private readonly ctx: BaseAudioContext;
   private readonly master: GainNode;
-  private readonly ombakHz: number;
+  /** Live-settable ombak detune in Hz (0 disables the paired-voice shimmer). */
+  ombakHz: number;
 
   constructor(ctx: BaseAudioContext, opts: WebAudioRendererOptions = {}) {
     this.ctx = ctx;
