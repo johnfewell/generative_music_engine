@@ -59,6 +59,10 @@ type NoteListener = (e: NoteEvent) => void;
 type FormListener = (e: FormEvent) => void;
 type TickListener = (e: TickEvent) => void;
 
+/** Passed to onStep listeners once per chain step. */
+export type StepInfo = { time: number; dt: number; step: number };
+type StepListener = (info: StepInfo) => void;
+
 // A wake this far behind now means the host was asleep (hidden tab): resync
 // forward rather than replay the backlog. Ported from the tiny-planet scheduler.
 const RESYNC_LATE_SEC = 0.8;
@@ -97,8 +101,15 @@ export class Conductor {
   // Watched to notice a rebuild() (which swaps eig) and reset stale detectors.
   private lastEig: Eigenpair[];
 
+  /** Multiplier applied to every emitted note velocity (mood urgency / crossfade). */
+  velocityGain = 1;
+  /** Probability of a dense ornament at high tension (mood urgency; default 0.5). */
+  ornamentProbability = 0.5;
+  private stepIndex = 0;
+  private readonly stepListeners = new Set<StepListener>();
+
   constructor(
-    private readonly engine: Engine,
+    readonly engine: Engine,
     opts: ConductorOptions,
   ) {
     this.stepsPerSec = opts.tempoStepsPerSec;
@@ -157,6 +168,16 @@ export class Conductor {
     };
   }
 
+  /**
+   * Register a callback fired once per chain step, at the START of the step
+   * (before its events are emitted) so a listener can retune params in time. The
+   * mood surface uses this to glide alpha/tempo/velocity. Returns an unsubscribe.
+   */
+  onStep(cb: StepListener): () => void {
+    this.stepListeners.add(cb);
+    return () => this.stepListeners.delete(cb);
+  }
+
   /** Begin scheduling. Idempotent. */
   start(): void {
     if (this.started) return;
@@ -209,6 +230,12 @@ export class Conductor {
   /** One `beat()`: advance the chain and emit its melody / pads / form events. */
   private emitStep(time: number, beat: number): void {
     const eng = this.engine;
+    // Step hooks run first so the mood can retune alpha/tempo/velocity for this step.
+    if (this.stepListeners.size) {
+      const info: StepInfo = { time, dt: beat, step: this.stepIndex };
+      for (const cb of this.stepListeners) cb(info);
+    }
+    this.stepIndex++;
     eng.step();
     const x = eng.x;
     const pi = eng.graph.pi;
@@ -232,7 +259,7 @@ export class Conductor {
     });
 
     // --- ornament: a dense flourish half a beat later when tension runs high ---
-    if (T > 1.1 && this.rng() < 0.5) {
+    if (T > 1.1 && this.rng() < this.ornamentProbability) {
       const n2 = Math.min(size - 1, note + (this.rng() < 0.5 ? 1 : 2));
       this.emitNote({
         time: time + beat * 0.5,
@@ -349,7 +376,8 @@ export class Conductor {
   }
 
   private emitNote(e: NoteEvent): void {
-    for (const cb of this.noteListeners) cb(e);
+    const out = this.velocityGain === 1 ? e : { ...e, velocity: e.velocity * this.velocityGain };
+    for (const cb of this.noteListeners) cb(out);
   }
   private emitForm(e: FormEvent): void {
     for (const cb of this.formListeners) cb(e);
