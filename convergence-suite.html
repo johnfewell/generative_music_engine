@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Convergence Suite — five ways to hear a Markov chain settle</title>
+<style>
+  :root{--bg:#0d1017;--panel:#161b26;--ink:#e9edf4;--dim:#8a94a6;
+        --a:#6ee7d8;--b:#f5b942;--c:#ef5d84;--d:#9d8cff;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:ui-monospace,'SF Mono',Menlo,monospace}
+  header{padding:16px 22px 4px}
+  h1{font-size:17px;margin:0}h1 span{color:var(--a)}
+  .sub{color:var(--dim);font-size:12px;margin-top:3px}
+  #tabs{display:flex;gap:6px;padding:12px 22px 0;flex-wrap:wrap}
+  .tab{background:var(--panel);border:1px solid #26304200;color:var(--dim);border-radius:8px 8px 0 0;
+       padding:8px 12px;font-family:inherit;font-size:12px;cursor:pointer}
+  .tab.on{color:var(--ink);border-color:#2c3750;background:#1b2231}
+  #layout{display:flex;gap:14px;padding:12px 22px 20px;flex-wrap:wrap}
+  .panel{background:var(--panel);border-radius:0 10px 10px 10px;padding:12px}
+  #vizPanel{flex:1 1 480px;min-width:400px}
+  #ctrlPanel{flex:0 0 300px;display:flex;flex-direction:column;gap:12px;border-radius:10px}
+  canvas{width:100%;border-radius:8px;background:#090c12;cursor:crosshair}
+  label{display:block;font-size:10px;color:var(--dim);margin-bottom:3px;text-transform:uppercase;letter-spacing:1px}
+  input[type=range]{width:100%;accent-color:var(--a)}
+  .row{display:flex;justify-content:space-between;font-size:12px;color:var(--dim)}
+  .val{color:var(--ink)}
+  button.play{background:var(--a);color:#03352c;border:none;border-radius:8px;padding:10px 0;
+       font-family:inherit;font-weight:700;font-size:14px;cursor:pointer;width:100%}
+  button.play.stop{background:var(--c);color:#fff}
+  #tensionWrap{height:12px;background:#090c12;border-radius:6px;overflow:hidden;margin-top:3px}
+  #tensionBar{height:100%;width:0%;background:linear-gradient(90deg,var(--a),var(--b),var(--c))}
+  #status{font-size:12px;color:var(--dim);min-height:32px;margin-top:8px;line-height:1.5}
+  #status b{color:var(--a)}
+  .info{font-size:11px;color:var(--dim);line-height:1.55;border-top:1px solid #242e42;padding-top:10px}
+  .info b{color:var(--ink)}
+  .mctrl{display:none;flex-direction:column;gap:12px}
+  .mctrl.on{display:flex}
+  .ach{font-size:11px;color:var(--dim)}.ach b{color:var(--b)}
+</style>
+</head>
+<body>
+<header>
+  <h1>CONVERGENCE <span>SUITE</span></h1>
+  <div class="sub">five novel generative-music engines, each built from a different theorem about how Markov chains settle</div>
+</header>
+
+<div id="tabs">
+  <button class="tab on" data-m="coupling">1 · coupling duet</button>
+  <button class="tab" data-m="cutoff">2 · cutoff drop</button>
+  <button class="tab" data-m="inverse">3 · inverse spectral</button>
+  <button class="tab" data-m="reso">4 · graph resonator</button>
+  <button class="tab" data-m="meta">5 · metastable suite</button>
+</div>
+
+<div id="layout">
+  <div class="panel" id="vizPanel">
+    <canvas id="cv" width="660" height="430"></canvas>
+    <div class="row" style="margin-top:8px"><label id="tLabel">tension</label><span class="val" id="tensionVal">–</span></div>
+    <div id="tensionWrap"><div id="tensionBar"></div></div>
+    <div id="status">press play.</div>
+  </div>
+
+  <div class="panel" id="ctrlPanel">
+    <button class="play" id="playBtn">▶ PLAY</button>
+    <div>
+      <div class="row"><label>tempo (steps/sec)</label><span class="val" id="tempoVal">4.0</span></div>
+      <input type="range" id="tempo" min="2" max="10" step="0.1" value="4">
+    </div>
+
+    <div class="mctrl on" id="c-coupling">
+      <div class="info"><b>Coupling duet.</b> Two walkers on a 12-note path share one stream of randomness:
+      each beat, one of them (chosen by coin flip) steps up or down. The moment they land on the same note
+      they <b>coalesce</b> and move as one forever — the standard coupling proof of mixing, played as a duet.
+      Every phrase has a random length but a guaranteed unison ending. Left voice / right voice have
+      different timbres; the gong marks coalescence.</div>
+      <div class="ach" id="coupStats">couplings: 0 · avg time: –</div>
+    </div>
+
+    <div class="mctrl" id="c-cutoff">
+      <div>
+        <div class="row"><label>hypercube dimension n</label><span class="val" id="cutNVal">64</span></div>
+        <input type="range" id="cutN" min="16" max="256" step="16" value="64">
+      </div>
+      <div class="info"><b>Cutoff drop.</b> The lazy walk on the n-dimensional hypercube doesn't mix gradually —
+      total-variation distance to π stays pinned near 1, then collapses abruptly around t* ≈ ½·n·ln n.
+      The build runs while distance ≈ 1 (riser, accelerating percussion); the <b>drop hits when TV crosses ½</b>
+      — its timing is a theorem, not a choice. Bigger n → sharper cliff. Exact distribution over Hamming
+      weights is computed every step.</div>
+      <div class="ach" id="cutStats">t* ≈ – steps</div>
+    </div>
+
+    <div class="mctrl" id="c-inverse">
+      <div>
+        <div class="row"><label>motif half-life (beats)</label><span class="val" id="hMVal">5</span></div>
+        <input type="range" id="hM" min="2" max="20" step="1" value="5">
+      </div>
+      <div>
+        <div class="row"><label>phrase half-life (beats)</label><span class="val" id="hPVal">30</span></div>
+        <input type="range" id="hP" min="10" max="100" step="2" value="30">
+      </div>
+      <div>
+        <div class="row"><label>section half-life (beats)</label><span class="val" id="hSVal">140</span></div>
+        <input type="range" id="hS" min="40" max="400" step="10" value="140">
+      </div>
+      <div class="ach" id="invAch">achieved: –</div>
+      <div class="info"><b>Inverse spectral composition.</b> You compose the <b>form</b>, not the notes:
+      set three decay half-lives and an optimizer synthesizes a hierarchical chain (tuning laziness and
+      two leak rates, re-running an eigensolver each iteration) until the measured spectrum matches.
+      Melody is emergent; motif, phrase and section decay at the rates you dialed in. Spectrum shows
+      target (hollow) vs achieved (filled).</div>
+    </div>
+
+    <div class="mctrl" id="c-reso">
+      <div>
+        <div class="row"><label>directional bias (irreversibility)</label><span class="val" id="biasVal">0.70</span></div>
+        <input type="range" id="bias" min="0" max="1" step="0.01" value="0.7">
+      </div>
+      <div>
+        <div class="row"><label>skip-3 weight</label><span class="val" id="skipVal">0.15</span></div>
+        <input type="range" id="skip" min="0" max="0.6" step="0.01" value="0.15">
+      </div>
+      <div class="info"><b>Graph resonator.</b> A <b>non-reversible</b> chain (directed ring) has complex
+      eigenvalues: each mode is a damped spiral — modulus = ring-down time, phase = rotation rate.
+      The transition matrix becomes a struck instrument: click to inject probability and hear modes
+      circulate as they decay. Bias = 0 is reversible (real spectrum, pure decay); slide it up and watch
+      the eigenvalues leave the real axis into the unit disc — circulation becomes audible.</div>
+    </div>
+
+    <div class="mctrl" id="c-meta">
+      <div>
+        <div class="row"><label>cluster leak (phrase scale)</label><span class="val" id="w2Val">0.050</span></div>
+        <input type="range" id="w2" min="0.005" max="0.3" step="0.005" value="0.05">
+      </div>
+      <div>
+        <div class="row"><label>super-cluster leak (section scale)</label><span class="val" id="w3Val">0.006</span></div>
+        <input type="range" id="w3" min="0.001" max="0.05" step="0.001" value="0.006">
+      </div>
+      <div class="info"><b>Metastable suite.</b> Nested near-decoupled clusters (2 supergroups × 2 clusters × 4 notes,
+      one register per cluster) split the spectrum into groups — one slow timescale per hierarchy level.
+      One walk generates note-, phrase- and section-level form simultaneously: three tension meters resolve
+      at different rates. Chime = phrase mixed, mid gong = section mixed, low gong = movement mixed (and re-seed).
+      This is the direct answer to Markov music's "long-range flattening".</div>
+      <div class="ach" id="metaStats">phrases 0 · sections 0 · movements 0</div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+// ================= shared: pitch =================
+const DEGS=[0,3,5,7,10];
+const pent=i=>36+12*Math.floor(i/5)+DEGS[i%5];
+const P16=Array.from({length:16},(_,i)=>pent(i));
+const P12=P16.slice(0,12);
+const CLDEG=[0,3,7,10];
+const clPitch=i=>36+12*Math.floor(i/4)+CLDEG[i%4];
+const midiF=m=>440*Math.pow(2,(m-69)/12);
+const rnd=n=>Math.floor(Math.random()*n);
+
+// ================= shared: linear algebra =================
+function zeros(n){return Array.from({length:n},()=>new Float64Array(n));}
+function jacobi(Sin,n){
+  const A=Sin.map(r=>Float64Array.from(r));
+  const V=zeros(n); for(let i=0;i<n;i++)V[i][i]=1;
+  for(let sw=0;sw<100;sw++){
+    let off=0;for(let p=0;p<n;p++)for(let q=p+1;q<n;q++)off+=A[p][q]*A[p][q];
+    if(off<1e-13)break;
+    for(let p=0;p<n;p++)for(let q=p+1;q<n;q++){
+      if(Math.abs(A[p][q])<1e-12)continue;
+      const th=(A[q][q]-A[p][p])/(2*A[p][q]);
+      const t=Math.sign(th||1)/(Math.abs(th)+Math.sqrt(th*th+1));
+      const c=1/Math.sqrt(t*t+1),s=t*c;
+      for(let k=0;k<n;k++){const kp=A[k][p],kq=A[k][q];A[k][p]=c*kp-s*kq;A[k][q]=s*kp+c*kq;}
+      for(let k=0;k<n;k++){const pk=A[p][k],qk=A[q][k];A[p][k]=c*pk-s*qk;A[q][k]=s*pk+c*qk;}
+      for(let k=0;k<n;k++){const vp=V[k][p],vq=V[k][q];V[k][p]=c*vp-s*vq;V[k][q]=s*vp+c*vq;}
+    }
+  }
+  const out=[];for(let i=0;i<n;i++)out.push({l:A[i][i],v:V.map(r=>r[i])});
+  out.sort((a,b)=>b.l-a.l);return out;
+}
+
+// ================= shared: audio =================
+let ctx=null,master=null,noiseBuf=null;
+function ensureAudio(){
+  if(ctx)return;
+  ctx=new (window.AudioContext||window.webkitAudioContext)();
+  master=ctx.createGain();master.gain.value=0.42;
+  const comp=ctx.createDynamicsCompressor();master.connect(comp);comp.connect(ctx.destination);
+  noiseBuf=ctx.createBuffer(1,ctx.sampleRate*1.2,ctx.sampleRate);
+  const ch=noiseBuf.getChannelData(0);for(let i=0;i<ch.length;i++)ch[i]=Math.random()*2-1;
+}
+function bar(freq,vel,dur,pan=0,partials=[[1,1],[2.76,.3],[5.4,.1]]){
+  const t0=ctx.currentTime;
+  const out=ctx.createGain();out.gain.value=1;
+  const p=ctx.createStereoPanner?ctx.createStereoPanner():null;
+  if(p){p.pan.value=pan;out.connect(p);p.connect(master);}else out.connect(master);
+  partials.forEach(([r,a],k)=>{
+    const o=ctx.createOscillator();o.type='sine';o.frequency.value=freq*r;
+    const g=ctx.createGain();
+    g.gain.setValueAtTime(0,t0);
+    g.gain.linearRampToValueAtTime(vel*a,t0+0.005);
+    g.gain.exponentialRampToValueAtTime(3e-4,t0+dur*(k?0.55:1));
+    o.connect(g);g.connect(out);o.start(t0);o.stop(t0+dur+0.05);
+  });
+}
+function strike(freq,vel,dur,pan=0){bar(freq+1.5,vel*.5,dur,pan);bar(freq-1.5,vel*.5,dur,pan);}
+function strikeB(freq,vel,dur,pan=0){ // second timbre (hollow/woody)
+  bar(freq,vel*.6,dur,pan,[[1,1],[3.2,.45],[6.9,.14]]);
+}
+function gong(base,vel,dur){
+  const t0=ctx.currentTime;
+  [[1,1],[1.52,.4],[2.48,.18],[.5,.25]].forEach(([r,a])=>{
+    const o=ctx.createOscillator();o.type='sine';
+    o.frequency.setValueAtTime(base*r*1.02,t0);
+    o.frequency.exponentialRampToValueAtTime(base*r,t0+.4);
+    const g=ctx.createGain();g.gain.setValueAtTime(0,t0);
+    g.gain.linearRampToValueAtTime(vel*a,t0+.02);
+    g.gain.exponentialRampToValueAtTime(3e-4,t0+dur);
+    o.connect(g);g.connect(master);o.start(t0);o.stop(t0+dur+.1);
+  });
+}
+function kick(vel){
+  const t0=ctx.currentTime;
+  const o=ctx.createOscillator();o.type='sine';
+  o.frequency.setValueAtTime(130,t0);o.frequency.exponentialRampToValueAtTime(42,t0+.12);
+  const g=ctx.createGain();g.gain.setValueAtTime(vel,t0);
+  g.gain.exponentialRampToValueAtTime(3e-4,t0+.22);
+  o.connect(g);g.connect(master);o.start(t0);o.stop(t0+.25);
+}
+function hat(vel){
+  const t0=ctx.currentTime;
+  const s=ctx.createBufferSource();s.buffer=noiseBuf;
+  const f=ctx.createBiquadFilter();f.type='highpass';f.frequency.value=7000;
+  const g=ctx.createGain();g.gain.setValueAtTime(vel,t0);
+  g.gain.exponentialRampToValueAtTime(3e-4,t0+.05);
+  s.connect(f);f.connect(g);g.connect(master);s.start(t0);s.stop(t0+.07);
+}
+function noiseBurst(freq,vel,dur=0.3){
+  const t0=ctx.currentTime;
+  const s=ctx.createBufferSource();s.buffer=noiseBuf;
+  const f=ctx.createBiquadFilter();f.type='bandpass';f.frequency.value=freq;f.Q.value=2;
+  const g=ctx.createGain();g.gain.setValueAtTime(0,t0);
+  g.gain.linearRampToValueAtTime(vel,t0+.03);
+  g.gain.exponentialRampToValueAtTime(3e-4,t0+dur);
+  s.connect(f);f.connect(g);g.connect(master);s.start(t0);s.stop(t0+dur+.05);
+}
+function bassHit(midi,vel=0.35,dur=0.9){
+  const t0=ctx.currentTime;
+  [0,7].forEach(det=>{
+    const o=ctx.createOscillator();o.type='sawtooth';
+    o.frequency.value=midiF(midi)*(1+det/1200);
+    const f=ctx.createBiquadFilter();f.type='lowpass';
+    f.frequency.setValueAtTime(900,t0);f.frequency.exponentialRampToValueAtTime(120,t0+dur);
+    const g=ctx.createGain();g.gain.setValueAtTime(vel*.5,t0);
+    g.gain.exponentialRampToValueAtTime(3e-4,t0+dur);
+    o.connect(f);f.connect(g);g.connect(master);o.start(t0);o.stop(t0+dur+.05);
+  });
+}
+
+// ================= shared: UI =================
+const cv=document.getElementById('cv'),g2=cv.getContext('2d');
+const W=660,H=430;
+function setStatus(h){document.getElementById('status').innerHTML=h;}
+function setTension(v,max=2){
+  document.getElementById('tensionVal').textContent=v.toFixed(3);
+  document.getElementById('tensionBar').style.width=Math.min(100,v/max*100)+'%';
+}
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+// ============ hierarchical chain factory (modes 3 & 5) ============
+// 16 nodes: 4 clusters of 4; clusters {0,1} and {2,3} form supergroups
+function makeHier(w2,w3){
+  const n=16,A=zeros(n);
+  const cl=i=>Math.floor(i/4),sg=i=>Math.floor(i/8);
+  for(let i=0;i<n;i++)for(let j=i+1;j<n;j++){
+    let w=0;
+    if(cl(i)===cl(j))w=1;
+    else if(sg(i)===sg(j))w=w2;
+    else w=w3;
+    A[i][j]=w;A[j][i]=w;
+  }
+  const deg=new Float64Array(n);let sum=0;
+  for(let i=0;i<n;i++){for(let j=0;j<n;j++)deg[i]+=A[i][j];sum+=deg[i];}
+  const pi=Array.from(deg,d=>d/sum);
+  const sq=Array.from(deg,Math.sqrt);
+  const S=zeros(n);
+  for(let i=0;i<n;i++)for(let j=0;j<n;j++)S[i][j]=A[i][j]/(sq[i]*sq[j]);
+  return {n,A,deg,pi,sq,eig:jacobi(S,n)};
+}
+function hierStep(eng,x,alpha){
+  const n=eng.n,nx=new Float64Array(n);
+  for(let i=0;i<n;i++){
+    nx[i]+=alpha*x[i];
+    const c=(1-alpha)*x[i]/eng.deg[i];
+    for(let j=0;j<n;j++)if(eng.A[i][j])nx[j]+=c*eng.A[i][j];
+  }
+  return nx;
+}
+function tv(x,pi){let s=0;for(let i=0;i<x.length;i++)s+=Math.abs(x[i]-pi[i]);return s/2;}
+function tv3(x,pi){ // full, cluster-level, super-level
+  const full=tv(x,pi);
+  let cl=0;for(let c=0;c<4;c++){let a=0,b=0;for(let i=c*4;i<c*4+4;i++){a+=x[i];b+=pi[i];}cl+=Math.abs(a-b);}
+  let sp=0;for(let s=0;s<2;s++){let a=0,b=0;for(let i=s*8;i<s*8+8;i++){a+=x[i];b+=pi[i];}sp+=Math.abs(a-b);}
+  return {full,cluster:cl/2,superg:sp/2};
+}
+function injectHier(eng,node){
+  const x=new Float64Array(eng.n);x[node]=0.7;
+  for(let j=0;j<eng.n;j++)if(eng.A[node][j])x[j]+=0.3*eng.A[node][j]/eng.deg[node];
+  return x;
+}
+function padModes(eng,x,alpha,scale){ // sound top-3 slow modes
+  const z=new Float64Array(eng.n);for(let i=0;i<eng.n;i++)z[i]=x[i]/eng.sq[i];
+  for(let k=1;k<=3;k++){
+    const e=eng.eig[k];let c=0;for(let i=0;i<eng.n;i++)c+=z[i]*e.v[i];
+    const amp=Math.abs(c);if(amp<0.05)continue;
+    const side=Math.sign(c);
+    const comps=e.v.map((v,i)=>({i,s:v*side})).filter(o=>o.s>0.12)
+      .sort((a,b)=>b.s-a.s).slice(0,2);
+    comps.forEach((cm,ci)=>strike(midiF(clPitch(cm.i)),Math.min(.09,amp*.26)*(ci?.6:1),scale*4,k===1?-.3:.3));
+  }
+}
+function drawHier(eng,x,marks){ // 4 cluster blobs
+  g2.clearRect(0,0,W,H);
+  const cent=[[165,120],[165,315],[495,120],[495,315]];
+  const off=[[-32,-32],[32,-32],[-32,32],[32,32]];
+  const pos=i=>{const c=cent[Math.floor(i/4)],o=off[i%4];return [c[0]+o[0],c[1]+o[1]];};
+  // edges
+  for(let i=0;i<16;i++)for(let j=i+1;j<16;j++)if(eng.A[i][j]>0){
+    const a=eng.A[i][j];
+    g2.strokeStyle=`rgba(110,231,216,${Math.min(.5,.04+a*.3)})`;
+    g2.lineWidth=.5+a;
+    g2.beginPath();g2.moveTo(...pos(i));g2.lineTo(...pos(j));g2.stroke();
+  }
+  for(let i=0;i<16;i++){
+    const [px,py]=pos(i),r=4+45*Math.sqrt(x[i]);
+    const ex=x[i]-eng.pi[i];
+    g2.beginPath();g2.arc(px,py,r,0,7);
+    g2.fillStyle=ex>0?`rgba(239,93,132,${.25+Math.min(.6,ex*3)})`:'rgba(110,231,216,.25)';
+    g2.fill();g2.strokeStyle='rgba(233,237,244,.45)';g2.lineWidth=1;g2.stroke();
+  }
+  ['I','II','III','IV'].forEach((t,c)=>{
+    g2.fillStyle='rgba(138,148,166,.9)';g2.font='11px ui-monospace';g2.textAlign='center';
+    g2.fillText('cluster '+t+' (reg '+(c+1)+')',cent[c][0],cent[c][1]+78);
+  });
+  // three meters
+  const m=[['movement ‖x−π‖',marks.full,css('--c')],['section',marks.superg,css('--b')],['phrase',marks.cluster,css('--a')]];
+  m.forEach(([lab,v,col],i)=>{
+    const y=30+i*26,bx=280,bw=130;
+    g2.fillStyle='rgba(138,148,166,1)';g2.font='10px ui-monospace';g2.textAlign='right';
+    g2.fillText(lab,bx-6,y+9);
+    g2.fillStyle='#090c12';g2.fillRect(bx,y,bw,12);
+    g2.fillStyle=col;g2.fillRect(bx,y,bw*Math.min(1,v),12);
+    g2.strokeStyle='rgba(233,237,244,.3)';g2.strokeRect(bx+bw*.25,y-1,1,14); // ¼ line
+  });
+}
+function drawSpectrumStrip(eig,alpha,y0,targets){ // small eigenvalue strip in canvas
+  const n=eig.length,bw=Math.min(20,(W-80)/n);
+  g2.fillStyle='rgba(138,148,166,1)';g2.font='10px ui-monospace';g2.textAlign='left';
+  g2.fillText('spectrum λ′ = α+(1−α)λ',40,y0-6);
+  for(let k=0;k<n;k++){
+    const l=alpha+(1-alpha)*eig[k].l;
+    const x0=40+k*(bw+2),h=Math.abs(l)*34;
+    g2.fillStyle='#090c12';g2.fillRect(x0,y0,bw,38);
+    g2.fillStyle=k===0?css('--c'):(l<0?css('--b'):css('--a'));
+    if(l>=0)g2.fillRect(x0,y0+38-h,bw,h);else g2.fillRect(x0,y0+38,bw,h*0.5);
+  }
+  if(targets){ // hollow target markers on modes 1..3
+    targets.forEach((lt,i)=>{
+      const k=i+1,x0=40+k*(bw+2),h=Math.abs(lt)*34;
+      g2.strokeStyle='#fff';g2.lineWidth=1.2;
+      g2.strokeRect(x0-1,y0+38-h-1,bw+2,h+2);
+    });
+  }
+}
+
+// ================= MODE 1: coupling duet =================
+const mCoupling={
+  a:1,b:10,coupled:false,age:0,t:0,times:[],trailA:[],trailB:[],
+  init(){this.a=1;this.b=10;this.coupled=false;this.age=0;this.t=0;this.trailA=[];this.trailB=[];},
+  beat(){
+    this.t++;
+    const mv=w=>Math.min(11,Math.max(0,w+(Math.random()<.5?-1:1)));
+    if(!this.coupled){
+      if(Math.random()<.5)this.a=mv(this.a);else this.b=mv(this.b);
+      const d=Math.abs(this.a-this.b);
+      strike(midiF(P12[this.a]),.13+.12*d/11,.55,-0.65);
+      strikeB(midiF(P12[this.b]),.13+.12*d/11,.55,0.65);
+      setTension(d,11);
+      if(this.a===this.b){
+        this.coupled=true;this.age=0;this.times.push(this.t);
+        gong(65,.5,4);
+        const avg=(this.times.reduce((x,y)=>x+y,0)/this.times.length).toFixed(1);
+        document.getElementById('coupStats').textContent=
+          `couplings: ${this.times.length} · avg time: ${avg} steps`;
+        setStatus(`<b>coalesced</b> on ${this.t} steps — the two walks are now one, forever`);
+      }
+    }else{
+      this.age++;
+      this.a=this.b=mv(this.a);
+      strike(midiF(P12[this.a]),.18,.7,-0.12);
+      strikeB(midiF(P12[this.a]),.18,.7,0.12);
+      setTension(0,11);
+      if(this.age>=10){
+        this.a=rnd(3);this.b=9+rnd(3);this.coupled=false;this.t=0;
+        setStatus('re-seeded far apart — new phrase, new random coupling time');
+      }
+    }
+    this.trailA.push(this.a);this.trailB.push(this.b);
+    if(this.trailA.length>120){this.trailA.shift();this.trailB.shift();}
+  },
+  draw(){
+    g2.clearRect(0,0,W,H);
+    const nx=i=>60+i*(W-120)/11;
+    // trails
+    const drawTrail=(tr,col)=>{
+      g2.strokeStyle=col;g2.lineWidth=1.2;g2.beginPath();
+      tr.forEach((v,k)=>{const y=H-40-k*2.6;const x=nx(v);k?g2.lineTo(x,y):g2.moveTo(x,y);});
+      g2.stroke();
+    };
+    drawTrail(this.trailA,'rgba(110,231,216,.65)');
+    drawTrail(this.trailB,'rgba(245,185,66,.65)');
+    // node line
+    for(let i=0;i<12;i++){
+      g2.beginPath();g2.arc(nx(i),H-40,5,0,7);
+      g2.fillStyle='rgba(233,237,244,.25)';g2.fill();
+      g2.fillStyle='rgba(138,148,166,.9)';g2.font='10px ui-monospace';g2.textAlign='center';
+      g2.fillText(['C','Eb','F','G','Bb'][i%5]+(2+Math.floor(i/5)),nx(i),H-18);
+    }
+    // walkers
+    const tok=(v,col)=>{g2.beginPath();g2.arc(nx(v),H-40,11,0,7);g2.fillStyle=col;g2.fill();};
+    if(this.coupled){tok(this.a,'rgba(239,93,132,.9)');}
+    else{tok(this.a,'rgba(110,231,216,.85)');tok(this.b,'rgba(245,185,66,.85)');
+      g2.strokeStyle='rgba(239,93,132,.5)';g2.lineWidth=2;
+      g2.beginPath();g2.moveTo(nx(this.a),H-52);
+      g2.quadraticCurveTo((nx(this.a)+nx(this.b))/2,H-52-Math.abs(this.a-this.b)*9,nx(this.b),H-52);
+      g2.stroke();}
+    g2.fillStyle='rgba(138,148,166,1)';g2.font='11px ui-monospace';g2.textAlign='left';
+    g2.fillText(this.coupled?`COALESCED — unison (age ${this.age})`:`step ${this.t} · distance ${Math.abs(this.a-this.b)}`,20,24);
+  },
+  click(){}, tempoHint:4
+};
+
+// ================= MODE 2: cutoff drop =================
+const mCutoff={
+  n:64,dist:null,pi:null,t:0,phase:'build',tvHist:[],phrase:0,dropT:null,quiet:0,
+  tStar(){return .5*this.n*Math.log(this.n);},
+  init(){
+    const n=this.n;
+    this.dist=new Float64Array(n+1);this.dist[0]=1;
+    // binomial(n,1/2) via log factorials
+    const lf=[0];for(let i=1;i<=n;i++)lf.push(lf[i-1]+Math.log(i));
+    this.pi=new Float64Array(n+1);
+    for(let w=0;w<=n;w++)this.pi[w]=Math.exp(lf[n]-lf[w]-lf[n-w]-n*Math.LN2);
+    this.t=0;this.phase='build';this.tvHist=[];this.dropT=null;this.quiet=0;
+    document.getElementById('cutStats').textContent=`t* ≈ ${Math.round(this.tStar())} steps`;
+  },
+  step(){
+    const n=this.n,d=this.dist,nd=new Float64Array(n+1);
+    for(let w=0;w<=n;w++){
+      if(!d[w])continue;
+      nd[w]+=.5*d[w];
+      if(w<n)nd[w+1]+=.5*d[w]*(n-w)/n;
+      if(w>0)nd[w-1]+=.5*d[w]*w/n;
+    }
+    this.dist=nd;
+  },
+  tvNow(){let s=0;for(let w=0;w<=this.n;w++)s+=Math.abs(this.dist[w]-this.pi[w]);return s/2;},
+  beat(){
+    this.t++;this.step();
+    const tvv=this.tvNow();this.tvHist.push(tvv);
+    if(this.tvHist.length>900)this.tvHist.shift();
+    const prog=Math.min(1,this.t/this.tStar());
+    let r=Math.random(),w=0;
+    for(let k=0;k<=this.n;k++){r-=this.dist[k];if(r<=0){w=k;break;}}
+    const note=P16[Math.round(w/this.n*15)];
+    if(this.phase==='build'){
+      if(this.t%4===0)kick(.4+.4*prog);
+      hat(.04+.22*prog*prog);
+      noiseBurst(200+4200*prog*prog,.03+.1*prog);
+      if(this.t%2===0)strike(midiF(note),.09+.13*prog,.4,0);
+      if(tvv<.5){
+        this.phase='groove';this.dropT=this.t;
+        gong(48,.8,5);bassHit(36,.5,1.2);
+        setStatus(`<b>CUTOFF</b> — dropped at step ${this.t} (theory t* ≈ ${Math.round(this.tStar())})`);
+      }
+    }else{
+      if(this.t%4===0)kick(.85);if(this.t%4===2)kick(.4);
+      hat(this.t%2?.18:.07);
+      if(this.t%8===0)bassHit(36,.35,.9);
+      strike(midiF(note),.17,.55,(w/this.n)*1.2-.6);
+      if(tvv<.02){this.quiet++;
+        if(this.quiet>16){this.phrase++;const ph=this.phrase;this.init();this.phrase=ph;
+          setStatus(`re-concentrated at vertex 0 — build ${ph+1} begins (distance snaps back to 1)`);}
+      }
+    }
+    setTension(tvv,1);
+  },
+  draw(){
+    g2.clearRect(0,0,W,H);
+    const n=this.n,x0=40,x1=W-30,y0=250,hh=180;
+    const mx=Math.max(...this.dist,...this.pi);
+    // stationary outline
+    g2.strokeStyle='rgba(138,148,166,.7)';g2.lineWidth=1;g2.beginPath();
+    for(let w=0;w<=n;w++){const x=x0+(x1-x0)*w/n,y=y0-hh*this.pi[w]/mx;
+      w?g2.lineTo(x,y):g2.moveTo(x,y);}
+    g2.stroke();
+    // current distribution
+    g2.fillStyle='rgba(110,231,216,.5)';g2.beginPath();g2.moveTo(x0,y0);
+    for(let w=0;w<=n;w++)g2.lineTo(x0+(x1-x0)*w/n,y0-hh*this.dist[w]/mx);
+    g2.lineTo(x1,y0);g2.fill();
+    g2.fillStyle='rgba(138,148,166,1)';g2.font='10px ui-monospace';g2.textAlign='left';
+    g2.fillText('current distribution over Hamming weight vs stationary (outline)',x0,30);
+    // TV timeline
+    const ty0=H-30,th=110,span=Math.max(this.tStar()*1.6,this.t+10);
+    g2.fillStyle='rgba(138,148,166,1)';g2.fillText('total-variation distance to π',x0,ty0-th-8);
+    g2.strokeStyle='rgba(233,237,244,.15)';g2.strokeRect(x0,ty0-th,x1-x0,th);
+    // t* marker
+    const xs=x0+(x1-x0)*this.tStar()/span;
+    g2.strokeStyle='rgba(245,185,66,.8)';g2.setLineDash([4,4]);
+    g2.beginPath();g2.moveTo(xs,ty0-th);g2.lineTo(xs,ty0);g2.stroke();g2.setLineDash([]);
+    g2.fillStyle='rgba(245,185,66,.9)';g2.fillText('t* (theory)',xs+4,ty0-th+12);
+    if(this.dropT){
+      const xd=x0+(x1-x0)*this.dropT/span;
+      g2.strokeStyle='rgba(239,93,132,.9)';
+      g2.beginPath();g2.moveTo(xd,ty0-th);g2.lineTo(xd,ty0);g2.stroke();
+      g2.fillStyle='rgba(239,93,132,.9)';g2.fillText('DROP',xd+4,ty0-4);
+    }
+    g2.strokeStyle=css('--a');g2.lineWidth=1.6;g2.beginPath();
+    const st=Math.max(0,this.t-this.tvHist.length);
+    this.tvHist.forEach((v,k)=>{
+      const x=x0+(x1-x0)*(st+k)/span,y=ty0-th*v;
+      k?g2.lineTo(x,y):g2.moveTo(x,y);
+    });
+    g2.stroke();
+  },
+  click(){}, tempoHint:8
+};
+
+// ================= MODE 3: inverse spectral =================
+const mInverse={
+  hMt:5,hPt:30,hSt:140,alpha:.4,w2:.05,w3:.006,eng:null,x:null,
+  ach:{},prevTV:{full:2,cluster:2,superg:2},cool:0,counts:{p:0,s:0,m:0},
+  hl(l){const a=Math.abs(l);return a>=.99999?Infinity:Math.LN2/(-Math.log(Math.max(a,1e-9)));},
+  measure(eng,alpha){
+    const L=k=>alpha+(1-alpha)*eng.eig[k].l;
+    return {hS:this.hl(L(1)),hP:this.hl((this.hl(L(2))+this.hl(L(3)))/2>0?(L(2)+L(3))/2:L(2)),hM:this.hl(L(4))};
+  },
+  resynth(){
+    let odds=this.alpha/(1-this.alpha),w2=this.w2,w3=this.w3;
+    let eng=null,m=null,alpha=this.alpha;
+    for(let it=0;it<22;it++){
+      alpha=odds/(1+odds);
+      eng=makeHier(w2,w3);
+      m=this.measure(eng,alpha);
+      const f=(a,t)=>Math.pow(Math.min(4,Math.max(.25,a/t)),.55);
+      odds*= (1/f(m.hM,this.hMt)); odds=Math.min(30,Math.max(.02,odds)); // hM too long → less lazy
+      w2*=f(m.hP,this.hPt); w2=Math.min(.6,Math.max(.001,w2));
+      w3*=f(m.hS,this.hSt); w3=Math.min(.2,Math.max(2e-4,w3));
+    }
+    this.alpha=alpha;this.w2=w2;this.w3=w3;this.eng=eng;this.ach=m;
+    document.getElementById('invAch').innerHTML=
+      `achieved: motif <b>${m.hM.toFixed(1)}</b>/${this.hMt} · phrase <b>${m.hP.toFixed(1)}</b>/${this.hPt} · section <b>${m.hS.toFixed(1)}</b>/${this.hSt} beats (α=${alpha.toFixed(2)}, leaks ${w2.toFixed(3)}/${w3.toFixed(4)})`;
+  },
+  init(){this.resynth();this.x=injectHier(this.eng,rnd(16));},
+  beat(){
+    this.x=hierStep(this.eng,this.x,this.alpha);
+    const m=tv3(this.x,this.eng.pi);
+    // melody
+    const sharp=Array.from(this.x,v=>Math.pow(v,1.4));
+    const Z=sharp.reduce((a,b)=>a+b,0);
+    let r=Math.random()*Z,note=0;
+    for(let i=0;i<16;i++){r-=sharp[i];if(r<=0){note=i;break;}}
+    strike(midiF(clPitch(note)+12),.1+.22*Math.min(1,m.full/1.2),.6,(note/15)*1.3-.65);
+    padModes(this.eng,this.x,this.alpha,.8);
+    // hierarchy markers
+    if(this.cool>0)this.cool--;
+    else{
+      if(m.cluster<.25&&this.prevTV.cluster>=.25){strike(midiF(84),.14,1.5,0);this.counts.p++;}
+      if(m.superg<.25&&this.prevTV.superg>=.25){gong(96,.3,2.5);this.counts.s++;}
+      if(m.full<.25&&this.prevTV.full>=.25){
+        gong(55,.55,4.5);this.counts.m++;this.cool=5;
+        this.x=injectHier(this.eng,rnd(16));
+        setStatus(`movement ${this.counts.m} fully mixed — re-seeded`);
+      }
+    }
+    this.prevTV=m;
+    setTension(m.full,1.6);
+  },
+  draw(){
+    drawHier(this.eng,this.x,this.prevTV);
+    const tgt=[2**(-1/this.hSt),2**(-1/this.hPt),2**(-1/this.hPt)];
+    drawSpectrumStrip(this.eng.eig,this.alpha,380,tgt);
+  },
+  click(node){this.x=injectHier(this.eng,node);setStatus('injected — listen for the three decay rates you dialed in');},
+  tempoHint:5
+};
+
+// ================= MODE 4: graph resonator =================
+const mReso={
+  n:16,bias:.7,skipW:.15,x:null,t:0,autoT:0,lastStrike:0,
+  kernel(){
+    const s=.25,m=.75,sk=m*this.skipW,rest=m-sk;
+    return {s,p:rest*(.5+.5*this.bias),q:rest*(.5-.5*this.bias),sk};
+  },
+  eigs(){
+    const {s,p,q,sk}=this.kernel();
+    // circulant: λ_j = s + p·e^{iθ} + q·e^{−iθ} + sk·e^{3iθ}, θ = 2πj/n
+    return Array.from({length:this.n},(_,j)=>{
+      const th=2*Math.PI*j/this.n;
+      const re=s+p*Math.cos(th)+q*Math.cos(-th)+sk*Math.cos(3*th);
+      const im=  p*Math.sin(th)+q*Math.sin(-th)+sk*Math.sin(3*th);
+      return {re,im,mag:Math.hypot(re,im)};
+    });
+  },
+  init(){this.x=new Float64Array(this.n);this.strikeAt(0,true);this.t=0;this.autoT=0;},
+  strikeAt(nd,silent){
+    const x=new Float64Array(this.n);x[nd]=1;this.x=x;
+    if(!silent&&ctx){gong(midiF(P16[nd])/2,.25,2);}
+  },
+  step(){
+    const {s,p,q,sk}=this.kernel(),n=this.n,nx=new Float64Array(n);
+    for(let k=0;k<n;k++){
+      const v=this.x[k];if(!v)continue;
+      nx[k]+=s*v;
+      nx[(k+1)%n]+=p*v;
+      nx[(k-1+n)%n]+=q*v;
+      nx[(k+3)%n]+=sk*v;
+    }
+    this.x=nx;
+  },
+  dft(){
+    const n=this.n,out=[];
+    for(let j=1;j<=8;j++){
+      let re=0,im=0;
+      for(let k=0;k<n;k++){const th=2*Math.PI*j*k/n;re+=this.x[k]*Math.cos(th);im-=this.x[k]*Math.sin(th);}
+      out.push({j,re,im,mag:Math.hypot(re,im)});
+    }
+    return out;
+  },
+  beat(){
+    this.t++;this.autoT++;this.step();
+    if(this.autoT>=14){this.autoT=0;const nd=rnd(this.n);this.strikeAt(nd);
+      setStatus(`struck node ${nd} — modes excited, listen to them circulate as they ring down`);}
+    const uni=1/this.n;let T=0;for(let i=0;i<this.n;i++)T+=Math.abs(this.x[i]-uni);T/=2;
+    // melody: circulation is audible because bias drags the fluid around the ring
+    const sharp=Array.from(this.x,v=>Math.pow(v,1.6));
+    const Z=sharp.reduce((a,b)=>a+b,0)||1;
+    let r=Math.random()*Z,note=0;
+    for(let i=0;i<this.n;i++){r-=sharp[i];if(r<=0){note=i;break;}}
+    strike(midiF(P16[note]),.1+.2*Math.min(1,T),.5,(note/15)*1.3-.65);
+    // mode voices: sign of Re(c_j) rotates at arg(λ_j) per step → audible spin per mode
+    const cs=this.dft().sort((a,b)=>b.mag-a.mag).slice(0,3);
+    cs.forEach((c,mi)=>{
+      if(c.mag<.04)return;
+      const idx=c.re>0?1+c.j:Math.min(15,4+c.j);
+      strikeB(midiF(P16[idx]),Math.min(.11,c.mag*.4)*(mi?0.7:1),1.6,mi===0?-.35:.35);
+    });
+    setTension(T,1);
+  },
+  draw(){
+    g2.clearRect(0,0,W,H);
+    // ring (left)
+    const cx=180,cy=215,R=140;
+    const pos=k=>{const a=-Math.PI/2+k*2*Math.PI/this.n;return [cx+R*Math.cos(a),cy+R*Math.sin(a)];};
+    // direction arrows
+    g2.strokeStyle='rgba(157,140,255,.35)';g2.lineWidth=1+3*this.bias;
+    g2.beginPath();g2.arc(cx,cy,R,-.4,.4);g2.stroke();
+    g2.fillStyle='rgba(157,140,255,.6)';g2.font='11px ui-monospace';g2.textAlign='center';
+    g2.fillText(this.bias>0.05?'→ drift':'reversible',cx,cy);
+    for(let k=0;k<this.n;k++){
+      const [px,py]=pos(k),r=4+48*Math.sqrt(this.x[k]);
+      g2.beginPath();g2.arc(px,py,r,0,7);
+      g2.fillStyle='rgba(110,231,216,.4)';g2.fill();
+      g2.strokeStyle='rgba(233,237,244,.4)';g2.lineWidth=1;g2.stroke();
+    }
+    g2.fillStyle='rgba(138,148,166,1)';g2.font='10px ui-monospace';g2.textAlign='center';
+    g2.fillText('directed ring — click to strike',cx,H-18);
+    // complex plane (right)
+    const px0=490,py0=215,pr=130;
+    g2.strokeStyle='rgba(233,237,244,.25)';g2.lineWidth=1;
+    g2.beginPath();g2.arc(px0,py0,pr,0,7);g2.stroke();
+    g2.beginPath();g2.moveTo(px0-pr,py0);g2.lineTo(px0+pr,py0);g2.stroke();
+    g2.beginPath();g2.moveTo(px0,py0-pr);g2.lineTo(px0,py0+pr);g2.stroke();
+    const eigs=this.eigs(),cs=this.dft();
+    eigs.forEach((e,j)=>{
+      const x=px0+pr*e.re,y=py0-pr*e.im;
+      const exc=j>=1&&j<=8?cs[j-1].mag:(j>8?cs[15-j]?.mag||0:0);
+      g2.beginPath();g2.arc(x,y,3+exc*22,0,7);
+      g2.fillStyle=j===0?css('--c'):`rgba(245,185,66,${.4+Math.min(.6,exc*2)})`;
+      g2.fill();
+    });
+    g2.fillStyle='rgba(138,148,166,1)';g2.textAlign='center';
+    g2.fillText('eigenvalues in the unit disc (size = excitation)',px0,H-18);
+    g2.fillText('real axis = pure decay · off-axis = rotation',px0,30);
+  },
+  click(node){this.strikeAt(node);setStatus(`struck node ${node}`);},
+  clickMap(mx,my){ // nearest ring node
+    const cx=180,cy=215,R=140;let best=0,bd=1e9;
+    for(let k=0;k<this.n;k++){
+      const a=-Math.PI/2+k*2*Math.PI/this.n;
+      const d=(cx+R*Math.cos(a)-mx)**2+(cy+R*Math.sin(a)-my)**2;
+      if(d<bd){bd=d;best=k;}
+    }
+    return best;
+  },
+  tempoHint:6
+};
+
+// ================= MODE 5: metastable suite =================
+const mMeta={
+  w2:.05,w3:.006,alpha:.3,eng:null,x:null,
+  prevTV:{full:2,cluster:2,superg:2},cool:0,counts:{p:0,s:0,m:0},
+  rebuild(){this.eng=makeHier(this.w2,this.w3);},
+  init(){this.rebuild();this.x=injectHier(this.eng,rnd(16));},
+  beat(){
+    this.x=hierStep(this.eng,this.x,this.alpha);
+    const m=tv3(this.x,this.eng.pi);
+    const sharp=Array.from(this.x,v=>Math.pow(v,1.4));
+    const Z=sharp.reduce((a,b)=>a+b,0);
+    let r=Math.random()*Z,note=0;
+    for(let i=0;i<16;i++){r-=sharp[i];if(r<=0){note=i;break;}}
+    strike(midiF(clPitch(note)+12),.1+.22*Math.min(1,m.full/1.2),.6,(note/15)*1.3-.65);
+    padModes(this.eng,this.x,this.alpha,.8);
+    if(this.cool>0)this.cool--;
+    else{
+      if(m.cluster<.25&&this.prevTV.cluster>=.25){strike(midiF(84),.14,1.5,0);this.counts.p++;}
+      if(m.superg<.25&&this.prevTV.superg>=.25){gong(96,.3,2.5);this.counts.s++;}
+      if(m.full<.25&&this.prevTV.full>=.25){
+        gong(55,.55,4.5);this.counts.m++;this.cool=5;
+        this.x=injectHier(this.eng,rnd(16));
+        setStatus(`movement ${this.counts.m} mixed at every scale — re-seeded`);
+      }
+      document.getElementById('metaStats').textContent=
+        `phrases ${this.counts.p} · sections ${this.counts.s} · movements ${this.counts.m}`;
+    }
+    this.prevTV=m;
+    setTension(m.full,1.6);
+  },
+  draw(){
+    drawHier(this.eng,this.x,this.prevTV);
+    drawSpectrumStrip(this.eng.eig,this.alpha,380,null);
+  },
+  click(node){this.x=injectHier(this.eng,node);setStatus('injected into one register — hear it leak outward scale by scale');},
+  tempoHint:5
+};
+
+// hier click mapping (modes 3 & 5)
+function hierClickMap(mx,my){
+  const cent=[[165,120],[165,315],[495,120],[495,315]];
+  const off=[[-32,-32],[32,-32],[-32,32],[32,32]];
+  let best=0,bd=1e9;
+  for(let i=0;i<16;i++){
+    const c=cent[Math.floor(i/4)],o=off[i%4];
+    const d=(c[0]+o[0]-mx)**2+(c[1]+o[1]-my)**2;
+    if(d<bd){bd=d;best=i;}
+  }
+  return best;
+}
+
+// ================= mode registry & main loop =================
+const MODES={coupling:mCoupling,cutoff:mCutoff,inverse:mInverse,reso:mReso,meta:mMeta};
+let cur='coupling',timer=null,stepDur=250;
+
+function switchMode(m){
+  cur=m;
+  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
+  document.querySelectorAll('.mctrl').forEach(d=>d.classList.toggle('on',d.id==='c-'+m));
+  MODES[m].init();
+  const t=MODES[m].tempoHint;
+  document.getElementById('tempo').value=t;
+  document.getElementById('tempoVal').textContent=t.toFixed(1);
+  stepDur=1000/t;
+  if(timer){clearInterval(timer);timer=setInterval(tick,stepDur);}
+  MODES[m].draw();
+  setStatus('mode: <b>'+document.querySelector('.tab[data-m='+m+']').textContent+'</b>');
+}
+function tick(){const M=MODES[cur];M.beat();M.draw();}
+
+document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>switchMode(b.dataset.m)));
+
+const playBtn=document.getElementById('playBtn');
+playBtn.addEventListener('click',()=>{
+  if(timer){clearInterval(timer);timer=null;playBtn.textContent='▶ PLAY';playBtn.classList.remove('stop');return;}
+  ensureAudio();ctx.resume();
+  timer=setInterval(tick,stepDur);
+  playBtn.textContent='■ STOP';playBtn.classList.add('stop');
+});
+document.getElementById('tempo').addEventListener('input',e=>{
+  const s=parseFloat(e.target.value);
+  document.getElementById('tempoVal').textContent=s.toFixed(1);
+  stepDur=1000/s;
+  if(timer){clearInterval(timer);timer=setInterval(tick,stepDur);}
+});
+
+cv.addEventListener('click',ev=>{
+  const rect=cv.getBoundingClientRect();
+  const mx=(ev.clientX-rect.left)*W/rect.width,my=(ev.clientY-rect.top)*H/rect.height;
+  const M=MODES[cur];
+  if(cur==='reso')M.click(M.clickMap(mx,my));
+  else if(cur==='inverse'||cur==='meta')M.click(hierClickMap(mx,my));
+  if(!timer)M.draw();
+});
+
+// per-mode controls
+document.getElementById('cutN').addEventListener('change',e=>{
+  mCutoff.n=parseInt(e.target.value);
+  document.getElementById('cutNVal').textContent=mCutoff.n;
+  mCutoff.init();if(cur==='cutoff')mCutoff.draw();
+});
+['hM','hP','hS'].forEach(id=>{
+  document.getElementById(id).addEventListener('input',e=>{
+    document.getElementById(id+'Val').textContent=e.target.value;});
+  document.getElementById(id).addEventListener('change',e=>{
+    mInverse.hMt=parseInt(document.getElementById('hM').value);
+    mInverse.hPt=parseInt(document.getElementById('hP').value);
+    mInverse.hSt=parseInt(document.getElementById('hS').value);
+    mInverse.resynth();
+    if(cur==='inverse'){mInverse.x=injectHier(mInverse.eng,rnd(16));mInverse.draw();
+      setStatus('re-synthesized chain to match your target half-lives');}
+  });
+});
+document.getElementById('bias').addEventListener('input',e=>{
+  mReso.bias=parseFloat(e.target.value);
+  document.getElementById('biasVal').textContent=mReso.bias.toFixed(2);
+  if(cur==='reso'&&!timer)mReso.draw();
+});
+document.getElementById('skip').addEventListener('input',e=>{
+  mReso.skipW=parseFloat(e.target.value);
+  document.getElementById('skipVal').textContent=mReso.skipW.toFixed(2);
+  if(cur==='reso'&&!timer)mReso.draw();
+});
+document.getElementById('w2').addEventListener('input',e=>{
+  mMeta.w2=parseFloat(e.target.value);
+  document.getElementById('w2Val').textContent=mMeta.w2.toFixed(3);
+  mMeta.rebuild();if(cur==='meta'&&!timer)mMeta.draw();
+});
+document.getElementById('w3').addEventListener('input',e=>{
+  mMeta.w3=parseFloat(e.target.value);
+  document.getElementById('w3Val').textContent=mMeta.w3.toFixed(3);
+  mMeta.rebuild();if(cur==='meta'&&!timer)mMeta.draw();
+});
+
+// init
+switchMode('coupling');
+</script>
+</body>
+</html>

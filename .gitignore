@@ -1,0 +1,9 @@
+node_modules/
+dist/
+*.log
+
+# beads databases (issues.jsonl is the tracked source of truth)
+.beads/*.db
+.beads/*.db-wal
+.beads/*.db-shm
+.beads/*.db-journal
