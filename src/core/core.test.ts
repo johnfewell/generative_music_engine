@@ -89,13 +89,13 @@ describe("graph builders", () => {
       leakSuper: 0.02,
     });
     expect(g.n).toBe(16);
+    expect(g.grouping.clusters).toBe(4);
+    expect(g.grouping.supers).toBe(2);
     // node 7 -> cluster 1, supergroup 0; node 8 -> cluster 2, supergroup 1
-    expect(Array.from(g.grouping.clusterOf)).toEqual([
-      0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3,
-    ]);
-    expect(Array.from(g.grouping.superOf)).toEqual([
-      0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1,
-    ]);
+    const clusterOf = Array.from({ length: 16 }, (_, i) => g.grouping.clusterOf(i));
+    const superOf = Array.from({ length: 16 }, (_, i) => g.grouping.superOf(i));
+    expect(clusterOf).toEqual([0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3]);
+    expect(superOf).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1]);
     // intra-cluster edge weight 1, same-super leak 0.1, cross-super leak 0.02
     expect(g.A[0][1]).toBe(1);
     expect(g.A[0][4]).toBe(0.1);

@@ -9,3 +9,5 @@
 export * from "./rng.js";
 export * from "./graph.js";
 export * from "./chain.js";
+export * from "./spectral.js";
+export * from "./metrics.js";

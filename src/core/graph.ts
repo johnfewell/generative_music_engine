@@ -45,15 +45,20 @@ export type HierarchicalTopology = {
   leakSuper: number;
 };
 
-/** Per-node membership for a hierarchical graph. */
+/**
+ * Per-node membership for a hierarchical graph, consumed by the hierarchical
+ * metrics (see metrics.ts). `clusterOf`/`superOf` are O(1) accessors rather than
+ * arrays so the same shape works for any cluster/supergroup sizes.
+ */
 export type Grouping = {
+  /** Cluster index of node `i`. */
+  clusterOf(i: number): number;
+  /** Supergroup index of node `i`. */
+  superOf(i: number): number;
+  /** Number of clusters. */
   clusters: number;
-  perCluster: number;
-  superGroups: number;
-  /** Cluster index of each node. */
-  clusterOf: Int32Array;
-  /** Supergroup index of each node. */
-  superOf: Int32Array;
+  /** Number of supergroups. */
+  supers: number;
 };
 
 /** An `n x n` array of zero rows. */
@@ -159,21 +164,8 @@ export function buildHierarchicalGraph(
   }
 
   const base = finalizeGraph(n, A);
-  const clusterArr = new Int32Array(n);
-  const superArr = new Int32Array(n);
-  for (let i = 0; i < n; i++) {
-    clusterArr[i] = clusterOf(i);
-    superArr[i] = superOf(i);
-  }
-
   return {
     ...base,
-    grouping: {
-      clusters,
-      perCluster,
-      superGroups,
-      clusterOf: clusterArr,
-      superOf: superArr,
-    },
+    grouping: { clusterOf, superOf, clusters, supers: superGroups },
   };
 }
