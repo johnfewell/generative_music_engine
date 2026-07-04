@@ -14,56 +14,21 @@
 
 import {
   CrossingDetector,
-  inject as injectMass,
-  jacobi,
+  createEngine,
   lazyLambda,
   modeCoeffs,
   sampleNode,
-  stepChain,
-  symmetrizedMatrix,
   tensionL1,
+  tvHierarchical,
 } from "../core/index.js";
-import type { Eigenpair, Graph, Rng } from "../core/index.js";
+import type { Eigenpair, Engine, Grouping, Rng } from "../core/index.js";
 import type { PitchMap } from "../pitch/index.js";
 import type { FormEvent, NoteEvent, TickEvent } from "./events.js";
 
-/**
- * The layer-1 bundle the conductor drives. The basic chain (createEngine) and
- * the metastable engine (a later task) both implement this shape.
- */
-export interface Engine {
-  /** The graph (supplies pi / node count / sqrtDeg). */
-  readonly graph: Graph;
-  /** Laziness of the walk; live-settable through the conductor. */
-  alpha: number;
-  /** Current distribution; replaced (not mutated) by step/inject. */
-  x: Float64Array;
-  /** Eigenpairs of the symmetrized transition matrix, sorted by eigenvalue. */
-  readonly eig: Eigenpair[];
-  /** Advance the chain one lazy step using the current alpha. */
-  step(): void;
-  /** Re-concentrate the distribution onto a node. */
-  inject(node: number): void;
-}
-
-/** Build the basic single-scale engine from a graph. */
-export function createEngine(
-  graph: Graph,
-  opts: { alpha?: number; x0?: Float64Array } = {},
-): Engine {
-  return {
-    graph,
-    alpha: opts.alpha ?? 0.15,
-    x: opts.x0 ? Float64Array.from(opts.x0) : injectMass(graph, 0),
-    eig: jacobi(symmetrizedMatrix(graph)),
-    step() {
-      this.x = stepChain(this.graph, this.x, this.alpha);
-    },
-    inject(node: number) {
-      this.x = injectMass(this.graph, node);
-    },
-  };
-}
+// Engine and createEngine are core concepts (see src/core/engine.ts); re-export
+// them here so existing conductor consumers keep working.
+export { createEngine };
+export type { Engine };
 
 /** Injectable interval scheduler (defaults to the host's setInterval). */
 type IntervalScheduler = (cb: () => void, ms: number) => unknown;
@@ -98,6 +63,8 @@ type TickListener = (e: TickEvent) => void;
 // forward rather than replay the backlog. Ported from the tiny-planet scheduler.
 const RESYNC_LATE_SEC = 0.8;
 const RESYNC_AHEAD_SEC = 0.2;
+// Steps to suppress re-firing a section/movement after it resolves.
+const METASTABLE_COOLDOWN = 5;
 
 export class Conductor {
   private readonly pitchMap: PitchMap;
@@ -110,15 +77,25 @@ export class Conductor {
   private readonly cancelInterval: IntervalCanceller | null;
 
   private readonly phraseDetector: CrossingDetector;
+  private readonly sectionDetector: CrossingDetector;
+  private readonly movementDetector: CrossingDetector;
   private readonly noteListeners = new Set<NoteListener>();
   private readonly formListeners = new Set<FormListener>();
   private readonly tickListeners = new Set<TickListener>();
+
+  // Set when the engine is hierarchical (metastable): drives section/movement
+  // events off the cluster/supergroup/full total-variation readings.
+  private readonly grouping: Grouping | null;
 
   private stepsPerSec: number;
   private started = false;
   private nextTime = 0;
   private phraseCount = 0;
+  private sectionCount = 0;
+  private movementCount = 0;
   private timerHandle: unknown = null;
+  // Watched to notice a rebuild() (which swaps eig) and reset stale detectors.
+  private lastEig: Eigenpair[];
 
   constructor(
     private readonly engine: Engine,
@@ -132,6 +109,12 @@ export class Conductor {
     this.phraseThreshold = opts.phraseThreshold ?? 0.25;
     this.pumpIntervalMs = opts.pumpIntervalMs ?? 100;
     this.phraseDetector = new CrossingDetector(this.phraseThreshold);
+    // section/movement use the source's 5-step cooldown (convergence-suite.html
+    // lines 724-733)
+    this.sectionDetector = new CrossingDetector(this.phraseThreshold, METASTABLE_COOLDOWN);
+    this.movementDetector = new CrossingDetector(this.phraseThreshold, METASTABLE_COOLDOWN);
+    this.grouping = (engine as { grouping?: Grouping }).grouping ?? null;
+    this.lastEig = engine.eig;
     const g = globalThis as unknown as {
       setInterval?: IntervalScheduler;
       clearInterval?: IntervalCanceller;
@@ -198,6 +181,8 @@ export class Conductor {
   inject(node: number): void {
     this.engine.inject(node);
     this.phraseDetector.reset();
+    this.sectionDetector.reset();
+    this.movementDetector.reset();
   }
 
   /**
@@ -293,22 +278,74 @@ export class Conductor {
       }
     }
 
-    // --- phrase: resolved when the walk mixes below threshold -> cadence + reseed ---
-    if (this.phraseDetector.update(T)) {
+    // --- form resolution ---
+    if (this.grouping) {
+      this.resolveHierarchical(time, size, x, pi);
+    } else {
+      // base single-scale (mixing-time): phrase resolves when L1 tension mixes
+      // below threshold -> cadence + reseed at a random node
+      if (this.phraseDetector.update(T)) {
+        this.phraseCount++;
+        const target = Math.floor(this.rng() * size);
+        this.emitCadence(time, target);
+        eng.inject(target); // re-concentrate before announcing, so listeners see the reseed
+        this.emitForm({ time, kind: "phraseResolved", count: this.phraseCount });
+      }
+    }
+  }
+
+  /**
+   * Metastable form: resolve phrase (cluster TV), section (supergroup TV) and
+   * movement (full TV) crossings. Only a movement re-injects — the source
+   * `mMeta` reseeds solely at the movement scale, so all three scales resolve
+   * once per movement epoch (superg first, then cluster, then full, per the
+   * data-processing inequality). Ported from convergence-suite.html lines 715-737.
+   */
+  private resolveHierarchical(
+    time: number,
+    size: number,
+    x: Float64Array,
+    pi: Float64Array,
+  ): void {
+    const grouping = this.grouping as Grouping;
+    // A rebuild() swapped the eigenpairs: reset detectors so the graph change
+    // can't read as a spurious downward crossing on this step.
+    if (this.engine.eig !== this.lastEig) {
+      this.phraseDetector.reset();
+      this.sectionDetector.reset();
+      this.movementDetector.reset();
+      this.lastEig = this.engine.eig;
+    }
+
+    const m = tvHierarchical(x, pi, grouping);
+    if (this.phraseDetector.update(m.cluster)) {
       this.phraseCount++;
-      const target = Math.floor(this.rng() * size);
-      this.emitNote({
-        time,
-        layer: "cadence",
-        node: target,
-        freq: this.pitchMap.freq(target) * 0.5, // cadence one octave down
-        velocity: 0.3,
-        duration: 1.2,
-        pan: 0,
-      });
-      eng.inject(target); // re-concentrate before announcing, so listeners see the reseed
       this.emitForm({ time, kind: "phraseResolved", count: this.phraseCount });
     }
+    if (this.sectionDetector.update(m.superg)) {
+      this.sectionCount++;
+      this.emitForm({ time, kind: "sectionResolved", count: this.sectionCount });
+    }
+    if (this.movementDetector.update(m.full)) {
+      this.movementCount++;
+      const target = Math.floor(this.rng() * size);
+      this.emitCadence(time, target);
+      this.engine.inject(target);
+      this.emitForm({ time, kind: "movementResolved", count: this.movementCount });
+    }
+  }
+
+  /** A bass cadence tone one octave below `node`. */
+  private emitCadence(time: number, node: number): void {
+    this.emitNote({
+      time,
+      layer: "cadence",
+      node,
+      freq: this.pitchMap.freq(node) * 0.5,
+      velocity: 0.3,
+      duration: 1.2,
+      pan: 0,
+    });
   }
 
   private emitNote(e: NoteEvent): void {
