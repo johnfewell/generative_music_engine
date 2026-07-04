@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>convergence — gamelan (same engine, different ear)</title>
+    <style>
+      :root {
+        --ink: #e8e8ea;
+        --dim: #9a9aa5;
+        --pink: #ff5d8f;
+        --blue: #6cc5ff;
+        --panel: #202028;
+      }
+      body {
+        font: 15px/1.5 system-ui, sans-serif;
+        color: var(--ink);
+        background: #14141a;
+        margin: 0;
+        padding: 1.5rem;
+      }
+      h1 {
+        font-size: 1.1rem;
+        margin: 0 0 1rem;
+      }
+      .wrap {
+        display: grid;
+        grid-template-columns: 660px 320px;
+        gap: 1.5rem;
+        align-items: start;
+      }
+      canvas {
+        background: var(--panel);
+        border-radius: 0.6rem;
+        display: block;
+      }
+      .panel {
+        background: var(--panel);
+        border-radius: 0.6rem;
+        padding: 1rem 1.1rem;
+      }
+      .row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin: 0.55rem 0;
+        gap: 0.6rem;
+      }
+      label {
+        color: var(--dim);
+      }
+      input[type="range"] {
+        width: 150px;
+      }
+      select,
+      button {
+        font: inherit;
+        color: inherit;
+        background: #2b2b36;
+        border: 1px solid #45454f;
+        border-radius: 0.4rem;
+        padding: 0.35rem 0.6rem;
+        cursor: pointer;
+      }
+      .val {
+        color: var(--blue);
+        font-variant-numeric: tabular-nums;
+        min-width: 3.2rem;
+        text-align: right;
+      }
+      .bar {
+        height: 10px;
+        background: #33333f;
+        border-radius: 5px;
+        overflow: hidden;
+      }
+      .bar > i {
+        display: block;
+        height: 100%;
+        background: linear-gradient(90deg, var(--blue), var(--pink));
+      }
+      #spectrum {
+        display: flex;
+        align-items: center;
+        height: 70px;
+        gap: 2px;
+        border-top: 1px solid #33333f;
+        border-bottom: 1px solid #33333f;
+      }
+      #spectrum > i {
+        flex: 1;
+        display: block;
+      }
+      .hint {
+        color: var(--dim);
+        font-size: 0.85rem;
+        margin-top: 0.6rem;
+      }
+      big {
+        font-size: 1.4rem;
+        color: var(--ink);
+      }
+    </style>
+  </head>
+  <body>
+    <h1>convergence · gamelan <span style="color: var(--dim)">(same engine, Balinese tuning)</span></h1>
+    <div class="wrap">
+      <div>
+        <canvas id="graph" width="660" height="430"></canvas>
+        <p class="hint">click a node to inject probability there</p>
+      </div>
+      <div class="panel">
+        <div class="row">
+          <label>topology</label>
+          <select id="topology">
+            <option value="ring">ring</option>
+            <option value="complete">complete</option>
+            <option value="bipartite">bipartite</option>
+            <option value="smallworld" selected>small-world</option>
+            <option value="clusters">clusters</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>scale</label>
+          <select id="scale">
+            <option value="selisir" selected>selisir (pelog)</option>
+            <option value="slendro">slendro</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>ombak (Hz)</label>
+          <input id="ombak" type="range" min="0" max="10" step="0.1" value="5" />
+          <span class="val" id="ombakVal">5.0</span>
+        </div>
+        <div class="row">
+          <label>laziness α</label>
+          <input id="alpha" type="range" min="0" max="0.9" step="0.01" value="0.15" />
+          <span class="val" id="alphaVal">0.15</span>
+        </div>
+        <div class="row">
+          <label>tempo (steps/s)</label>
+          <input id="tempo" type="range" min="1" max="10" step="0.5" value="4" />
+          <span class="val" id="tempoVal">4</span>
+        </div>
+        <div class="row">
+          <button id="play">▶ play</button>
+          <span class="val" id="phrase">0</span>
+        </div>
+        <div class="row"><label>tension ‖x−π‖₁</label><span class="val" id="tensionVal">0.000</span></div>
+        <div class="bar"><i id="tensionBar" style="width: 0%"></i></div>
+
+        <div class="row" style="margin-top: 1rem"><label>mode spectrum λ′</label></div>
+        <div id="spectrum"></div>
+        <div class="row">
+          <label>mixing time (steps)</label><big id="tmix">–</big>
+        </div>
+        <p class="hint">
+          The same Markov-convergence engine as the 12-TET demo, retuned to a 10-node Balinese
+          scale (stretched 1205-cent octave). Every strike is a detuned pair — the ombak shimmer.
+        </p>
+      </div>
+    </div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

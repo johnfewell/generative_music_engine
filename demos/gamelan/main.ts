@@ -1,4 +1,4 @@
-// Mixing-time composer, rebuilt on top of the library. This file is pure
+// Gamelan composer, rebuilt on top of the library. This file is pure
 // presentation + wiring: every bit of math comes from `convergence/core`, all
 // audio from `convergence/render/webaudio`, all scheduling from
 // `convergence/conductor`. If the demo ever needed to reimplement any of that,
@@ -12,14 +12,27 @@ import {
   tensionL1,
 } from "convergence/core";
 import type { Topology } from "convergence/core";
-import { pentatonicMinor } from "convergence/pitch";
+import { fromCents, SELISIR, SLENDRO } from "convergence/pitch";
 import { Conductor } from "convergence/conductor";
 import { WebAudioRenderer } from "convergence/render/webaudio";
 
-const PITCH = pentatonicMinor(48, 2.4);
+const SCALES = { selisir: SELISIR, slendro: SLENDRO };
+const LABELS = ["ding", "dong", "deng", "dung", "dang"];
+let inner = fromCents({ baseHz: 210, steps: SELISIR, octaveCents: 1205, count: 10 });
+const PITCH = {
+  size: 10,
+  freq: (i: number) => inner.freq(i),
+  label: (i: number) => LABELS[i % 5] + (i < 5 ? "" : "ʼ"),
+};
 const N = PITCH.size;
 
-const state = { alpha: 0.15, tempo: 4, topology: "smallworld" as Topology["kind"] };
+const state = {
+  alpha: 0.15,
+  tempo: 4,
+  topology: "smallworld" as Topology["kind"],
+  scale: "selisir" as keyof typeof SCALES,
+  ombak: 5,
+};
 let ctx: AudioContext | null = null;
 let conductor = makeConductor();
 let renderer: WebAudioRenderer | null = null;
@@ -75,7 +88,7 @@ function rebuild(): void {
 function play(): void {
   if (!ctx) ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
   void ctx.resume();
-  if (!renderer) renderer = new WebAudioRenderer(ctx, { gain: 0.4 });
+  if (!renderer) renderer = new WebAudioRenderer(ctx, { gain: 0.4, ombakHz: state.ombak });
   detach = renderer.attach(conductor);
   conductor.start();
   playing = true;
@@ -159,6 +172,22 @@ $("play").addEventListener("click", () => (playing ? stop() : play()));
 ($("topology") as HTMLSelectElement).addEventListener("change", (e) => {
   state.topology = (e.target as HTMLSelectElement).value as Topology["kind"];
   rebuild();
+});
+
+($("scale") as HTMLSelectElement).addEventListener("change", (e) => {
+  state.scale = (e.target as HTMLSelectElement).value as keyof typeof SCALES;
+  // retune the PitchMap only — the walk keeps running, engine untouched
+  inner = fromCents({ baseHz: 210, steps: SCALES[state.scale], octaveCents: 1205, count: 10 });
+});
+
+($("ombak") as HTMLInputElement).addEventListener("input", (e) => {
+  state.ombak = parseFloat((e.target as HTMLInputElement).value);
+  $("ombakVal").textContent = state.ombak.toFixed(1);
+  if (renderer && ctx) {
+    detach?.();
+    renderer = new WebAudioRenderer(ctx, { gain: 0.4, ombakHz: state.ombak });
+    detach = renderer.attach(conductor);
+  }
 });
 
 ($("alpha") as HTMLInputElement).addEventListener("input", (e) => {

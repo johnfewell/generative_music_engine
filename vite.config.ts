@@ -23,6 +23,7 @@ export default defineConfig({
       input: {
         "renderer-smoke": resolve(process.cwd(), "demos/renderer-smoke.html"),
         "mixing-time": resolve(process.cwd(), "demos/mixing-time/index.html"),
+        gamelan: resolve(process.cwd(), "demos/gamelan/index.html"),
       },
     },
   },
