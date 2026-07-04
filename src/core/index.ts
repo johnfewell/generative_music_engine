@@ -3,6 +3,9 @@
 // Strict boundary: ZERO dependencies, NO audio, NO timers, NO Math.random
 // (a seedable RNG is injected). Must never import from mood / conductor / render.
 //
-// Populated by later tasks: seedable RNG, graph builders, Markov chain step,
-// Jacobi eigensolver + spectral helpers, tension / total-variation metrics.
-export {};
+// Populated incrementally: seedable RNG, graph builders, Markov chain step
+// (this task); Jacobi eigensolver + spectral helpers, tension /
+// total-variation metrics (later tasks).
+export * from "./rng.js";
+export * from "./graph.js";
+export * from "./chain.js";
