@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>convergence — renderer smoke test</title>
+    <style>
+      body {
+        font: 16px/1.5 system-ui, sans-serif;
+        max-width: 40rem;
+        margin: 4rem auto;
+        padding: 0 1rem;
+        color: #e8e8ea;
+        background: #17171b;
+      }
+      button {
+        font: inherit;
+        padding: 0.6rem 1.2rem;
+        border-radius: 0.5rem;
+        border: 1px solid #4a4a55;
+        background: #24242c;
+        color: inherit;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #2d2d38;
+      }
+      code {
+        color: #9ad;
+      }
+      #status {
+        margin-top: 1rem;
+        color: #9a9aa5;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>convergence renderer smoke test</h1>
+    <p>
+      Builds an <code>AudioContext</code>, a mixing-time engine, a conductor, and the bundled
+      <code>WebAudioRenderer</code>, then plays. Click to start (browsers require a gesture
+      before audio).
+    </p>
+    <button id="toggle">▶ play</button>
+    <div id="status">idle</div>
+
+    <script type="module">
+      import { createMixingTimeEngine, mulberry32 } from "convergence/core";
+      import { pentatonicMinor } from "convergence/pitch";
+      import { Conductor } from "convergence/conductor";
+      import { WebAudioRenderer } from "convergence/render/webaudio";
+
+      let ctx = null;
+      let conductor = null;
+      let playing = false;
+      const btn = document.getElementById("toggle");
+      const status = document.getElementById("status");
+
+      btn.addEventListener("click", async () => {
+        if (!ctx) {
+          ctx = new (window.AudioContext || window.webkitAudioContext)();
+          const engine = createMixingTimeEngine({
+            topology: { kind: "smallworld", nodes: 12 },
+            alpha: 0.15,
+            seed: 7,
+          });
+          conductor = new Conductor(engine, {
+            tempoStepsPerSec: 4,
+            pitchMap: pentatonicMinor(48, 2.4),
+            clock: () => ctx.currentTime,
+            rng: mulberry32(12345),
+          });
+          const renderer = new WebAudioRenderer(ctx, { gain: 0.4 });
+          renderer.attach(conductor);
+        }
+        await ctx.resume();
+        if (playing) {
+          conductor.stop();
+          playing = false;
+          btn.textContent = "▶ play";
+          status.textContent = "stopped";
+        } else {
+          conductor.start();
+          playing = true;
+          btn.textContent = "⏸ stop";
+          status.textContent = "playing — melody + eigenmode pads, phrases reseed on mixing";
+        }
+      });
+    </script>
+  </body>
+</html>

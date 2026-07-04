@@ -2,5 +2,6 @@
 //
 // Games may ignore this entirely and consume conductor events directly.
 //
-// Populated by later tasks: WebAudio instrument palette + ombak.
-export {};
+// WebAudio instrument palette + renderer.
+export * from "./palette.js";
+export * from "./renderer.js";
