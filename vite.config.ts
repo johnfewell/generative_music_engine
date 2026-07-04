@@ -22,6 +22,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         "renderer-smoke": resolve(process.cwd(), "demos/renderer-smoke.html"),
+        "mixing-time": resolve(process.cwd(), "demos/mixing-time/index.html"),
       },
     },
   },
