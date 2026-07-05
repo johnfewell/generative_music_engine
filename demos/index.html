@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>convergence — demos</title>
+    <style>
+      body {
+        font: 16px/1.6 system-ui, sans-serif;
+        color: #e8e8ea;
+        background: #14141a;
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+      }
+      main {
+        max-width: 34rem;
+        padding: 2rem;
+      }
+      h1 {
+        font-size: 1.4rem;
+        margin: 0 0 0.3rem;
+      }
+      p.lead {
+        color: #9a9aa5;
+        margin: 0 0 1.6rem;
+      }
+      a.card {
+        display: block;
+        text-decoration: none;
+        color: inherit;
+        background: #202028;
+        border: 1px solid #2e2e38;
+        border-radius: 0.6rem;
+        padding: 1rem 1.2rem;
+        margin: 0.7rem 0;
+        transition: border-color 0.15s, transform 0.15s;
+      }
+      a.card:hover {
+        border-color: #6cc5ff;
+        transform: translateY(-1px);
+      }
+      a.card b {
+        color: #6cc5ff;
+      }
+      a.card span {
+        color: #9a9aa5;
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>convergence</h1>
+      <p class="lead">Generative music from Markov-chain convergence. Pick a demo:</p>
+
+      <a class="card" href="/mixing-time/index.html">
+        <b>Mixing-time composer →</b><br />
+        <span>The full engine: topology, laziness, live spectrum, click-a-node injection.</span>
+      </a>
+      <a class="card" href="/gamelan/index.html">
+        <b>Gamelan →</b><br />
+        <span>The same engine retuned to Balinese scales with ombak beating.</span>
+      </a>
+      <a class="card" href="/renderer-smoke.html">
+        <b>Renderer smoke test →</b><br />
+        <span>Bare minimum: one button, engine + conductor + WebAudio renderer.</span>
+      </a>
+    </main>
+  </body>
+</html>

@@ -21,6 +21,7 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
+        index: resolve(process.cwd(), "demos/index.html"),
         "renderer-smoke": resolve(process.cwd(), "demos/renderer-smoke.html"),
         "mixing-time": resolve(process.cwd(), "demos/mixing-time/index.html"),
         gamelan: resolve(process.cwd(), "demos/gamelan/index.html"),
