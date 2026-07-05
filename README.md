@@ -27,6 +27,12 @@ Then open the printed URL (default http://localhost:5173/):
 - **/gamelan/** — the same engine retuned to a 10-node Balinese scale with a
   stretched 1205-cent octave. Switch selisir ↔ slendro while it plays, and
   control the ombak (paired-detune beating) in Hz.
+- **/tiny-planet/** — a small walkable planet with a **Tone.js** rig (the
+  "bring your own audio" path): the metastable engine carries phrase, section
+  and movement form; the mood surface breathes with a day/night cycle and your
+  motion; and the two panned melody voices are two draws from the same walk —
+  in unison when probability is freshly planted, drifting apart as the chain
+  mixes. Walk with A/D, plant notes with E or a click, catch stars.
 - **/renderer-smoke.html** — minimal renderer check.
 
 The demos are served straight from `src/` via vite aliases — no build step.
@@ -96,6 +102,10 @@ conductor.on("tick", (e) => {
 Events are emitted ahead of time by a look-ahead scheduler (default 1.2 s), so
 they can be sample-accurately scheduled by the host. A hidden tab resyncs
 forward instead of bursting a backlog on wake.
+
+`demos/tiny-planet/rig.ts` is a worked example: a Tone.js instrument rig
+(AM pad, panned FM duet, MonoSynth bass) driven entirely by this event stream,
+with `clock: () => Tone.now()` so conductor times are Tone times.
 
 ## Modules
 
