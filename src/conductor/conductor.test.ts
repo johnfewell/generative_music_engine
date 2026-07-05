@@ -186,4 +186,40 @@ describe("Conductor scheduling", () => {
     expect(conductor.alpha).toBe(0.4);
     expect(engine.alpha).toBe(0.4);
   });
+
+  it("invokes the default global timer with the global as receiver", () => {
+    // Reproduce the browser's "Illegal invocation" guard: setInterval /
+    // clearInterval are not generic and throw if `this` isn't the global.
+    const realSI = globalThis.setInterval;
+    const realCI = globalThis.clearInterval;
+    let scheduled = 0;
+    let cleared = 0;
+    globalThis.setInterval = function (this: unknown): number {
+      if (this !== globalThis) throw new TypeError("Illegal invocation");
+      scheduled++;
+      return 42;
+    } as unknown as typeof realSI;
+    globalThis.clearInterval = function (this: unknown): void {
+      if (this !== globalThis) throw new TypeError("Illegal invocation");
+      cleared++;
+    } as unknown as typeof realCI;
+    try {
+      const engine = createEngine(buildGraph({ kind: "ring", nodes: 12 }));
+      const clock = makeClock(0);
+      // no setInterval override -> exercises the default global path
+      const c = new Conductor(engine, {
+        tempoStepsPerSec: 4,
+        pitchMap: pentatonicMinor(48, 2.4),
+        clock: clock.now,
+        rng: mulberry32(1),
+      });
+      expect(() => c.start()).not.toThrow();
+      expect(scheduled).toBe(1);
+      expect(() => c.stop()).not.toThrow();
+      expect(cleared).toBe(1);
+    } finally {
+      globalThis.setInterval = realSI;
+      globalThis.clearInterval = realCI;
+    }
+  });
 });

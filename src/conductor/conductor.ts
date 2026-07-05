@@ -130,8 +130,15 @@ export class Conductor {
       setInterval?: IntervalScheduler;
       clearInterval?: IntervalCanceller;
     };
-    this.scheduleInterval = opts.setInterval ?? g.setInterval ?? null;
-    this.cancelInterval = opts.clearInterval ?? g.clearInterval ?? null;
+    // Wrap the globals so they are invoked with the global object as receiver.
+    // Browsers throw "Illegal invocation" if setInterval/clearInterval are
+    // called with any other `this` (e.g. `this.scheduleInterval(...)` would set
+    // `this` to the Conductor instance). Node doesn't care, which is why this
+    // only surfaced in the browser.
+    this.scheduleInterval =
+      opts.setInterval ?? (g.setInterval ? (cb, ms) => g.setInterval!(cb, ms) : null);
+    this.cancelInterval =
+      opts.clearInterval ?? (g.clearInterval ? (h) => g.clearInterval!(h) : null);
   }
 
   /** Steps per second; setting it retimes future steps immediately. */
