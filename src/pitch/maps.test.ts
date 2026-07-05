@@ -86,4 +86,11 @@ describe("fromCents (gamelan)", () => {
     expect(m.freq(1)).toBeCloseTo(200, 9);
     expect(m.freq(2)).toBeCloseTo(400, 9);
   });
+
+  it("uses provided labels, falling back to cents past the end", () => {
+    const m = fromCents({ baseHz: 210, steps: SELISIR, count: 10, labels: ["ding", "dong"] });
+    expect(m.label(0)).toBe("ding");
+    expect(m.label(1)).toBe("dong");
+    expect(m.label(2)).toBe("270c");
+  });
 });

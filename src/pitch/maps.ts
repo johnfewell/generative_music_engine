@@ -68,6 +68,8 @@ export type CentsScaleOptions = {
   octaveCents?: number;
   /** Total number of nodes. */
   count: number;
+  /** Per-node labels (e.g. gamelan solfège); defaults to the cents offset. */
+  labels?: string[];
 };
 
 /**
@@ -81,13 +83,14 @@ export function fromCents({
   steps,
   octaveCents = 1200,
   count,
+  labels,
 }: CentsScaleOptions): PitchMap {
   const L = steps.length;
   const centsOf = (i: number) => Math.floor(i / L) * octaveCents + steps[i % L];
   return {
     size: count,
     freq: (node) => baseHz * Math.pow(2, centsOf(node) / 1200),
-    label: (node) => `${Math.round(centsOf(node))}c`,
+    label: (node) => labels?.[node] ?? `${Math.round(centsOf(node))}c`,
   };
 }
 

@@ -37,7 +37,7 @@ type IntervalCanceller = (handle: unknown) => void;
 export type ConductorOptions = {
   /** Chain steps per second (musical tempo). Live-settable. */
   tempoStepsPerSec: number;
-  /** Node-index -> frequency mapping. */
+  /** Node-index -> frequency mapping. Swap `conductor.pitchMap` to retune live. */
   pitchMap: PitchMap;
   /** Monotonic clock in seconds (e.g. AudioContext.currentTime or Tone.now). */
   clock: () => number;
@@ -71,7 +71,6 @@ const RESYNC_AHEAD_SEC = 0.2;
 const METASTABLE_COOLDOWN = 5;
 
 export class Conductor {
-  private readonly pitchMap: PitchMap;
   private readonly clock: () => number;
   private readonly rng: Rng;
   private readonly lookAheadSec: number;
@@ -105,6 +104,12 @@ export class Conductor {
   velocityGain = 1;
   /** Probability of a dense ornament at high tension (mood urgency; default 0.5). */
   ornamentProbability = 0.5;
+  /**
+   * Node-index -> frequency map. Live-settable: notes emitted after a swap use
+   * the new tuning; the walk, engine and scheduled times are untouched. The new
+   * map's size must cover the engine's node count.
+   */
+  pitchMap: PitchMap;
   private stepIndex = 0;
   private readonly stepListeners = new Set<StepListener>();
 

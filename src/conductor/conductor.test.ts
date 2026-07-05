@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildGraph, mulberry32 } from "../core/index.js";
-import { pentatonicMinor } from "../pitch/index.js";
+import { fromMidi, pentatonicMinor } from "../pitch/index.js";
 import { Conductor, createEngine } from "./conductor.js";
 import type { FormEvent, NoteEvent } from "./events.js";
 
@@ -176,6 +176,32 @@ describe("Conductor scheduling", () => {
 
     const c = run(8);
     expect(c.notes).not.toEqual(a.notes);
+  });
+
+  it("retunes live when pitchMap is swapped mid-run", () => {
+    const { conductor, clock } = makeConductor();
+    const before = pentatonicMinor(48, 2.4); // same table the conductor starts with
+    const after = fromMidi(Array.from({ length: 12 }, (_, i) => 60 + i));
+    let current = before;
+    let notesAfterSwap = 0;
+    conductor.on("note", (e) => {
+      // melody and ornament carry the pitch map's frequency for their node
+      if (e.layer !== "melody" && e.layer !== "ornament") return;
+      expect(e.freq).toBeCloseTo(current.freq(e.node), 9);
+      if (current === after) notesAfterSwap++;
+    });
+    conductor.start();
+    for (let i = 0; i < 100; i++) {
+      conductor.pump();
+      clock.advance(0.05);
+    }
+    conductor.pitchMap = after;
+    current = after;
+    for (let i = 0; i < 100; i++) {
+      conductor.pump();
+      clock.advance(0.05);
+    }
+    expect(notesAfterSwap).toBeGreaterThan(0);
   });
 
   it("live tempo and alpha setters proxy through to timing and the engine", () => {
