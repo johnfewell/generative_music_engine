@@ -141,3 +141,10 @@ library was ported from; the ports in `src/` cite them by line. `demos/` is
 the same music rebuilt on the library — those files are deliberately pure
 wiring, and any math they'd need to reimplement is treated as a missing
 library feature.
+
+## License
+
+[PolyForm Noncommercial 1.0.0](./LICENSE.md): you may use, modify, and share
+this software for any noncommercial purpose; commercial use is not permitted.
+
+Required Notice: Copyright John Fewell (https://github.com/johnfewell/generative_music_engine)
